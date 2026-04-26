@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 const DP={name:"Hari Krishna S.",title:"Senior DevOps Engineer — AWS & Cloud",email:"s.harikrishna.1205@gmail.com",phone:"+91 9491370132",loc:"Hyderabad, India",li:"linkedin.com/in/hari-devops",gh:"github.com/haridevops05",web:"harikrishna.dev",sum:"AWS SA Professional with 6+ years in cloud-native infra. Kubernetes (EKS/KOPS/AKS/OpenShift), Terraform, GitLab CI/CD, Jenkins, Istio, ArgoCD GitOps, DevSecOps.",skills:"AWS EKS,Terraform,GitLab CI/CD,Jenkins,ArgoCD,Argo Rollouts,Istio,Falco,Kyverno,Kube-Bench,Trivy,ESO,Docker,Kubernetes,Helm,Kustomize,Prometheus,Grafana,Datadog,EFK,Python,Ansible,OpenShift,GitHub Actions,Vault,CloudFormation,Jaeger,Kiali",exp:"6+ years",certs:"AWS SA Professional, Red Hat OpenShift EX-280",highlights:"CI 45min→8min | Cost $1500→$300/mo | 15+ daily deploys | MTTR 2hrs→15min | CIS 94/100 | 99.9% uptime 20+ svc | SOC2/HIPAA | Zero secrets",current:"Senior DevOps Engineer @ Brillio (prev. Accenture)",avail:"Immediate Joiner — Remote/Hybrid/Relocation"};
 
-const CORS="https://api.codetabs.com/v1/proxy?quest=";
+const CORS="https://api.allorigins.win/raw?url=";
 const FEEDS=[{id:"remoteok",name:"RemoteOK",url:"https://remoteok.com/api?tag=devops",p:"rok"},{id:"remotive",name:"Remotive",url:"https://remotive.com/api/remote-jobs?category=devops",p:"rem"},{id:"arbeitnow",name:"Arbeitnow",url:"https://www.arbeitnow.com/api/job-board-api?search=devops",p:"abn"}];
 
 function parseJ(p,d){if(p==="rok")return(Array.isArray(d)?d:[]).filter(j=>j.position).slice(0,12).map(j=>({id:"r"+j.id,t:j.position,co:j.company||"?",url:j.url||"https://remoteok.com",dt:j.date||new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:j.salary_min?`$${(j.salary_min/1e3).toFixed(0)}k–$${(j.salary_max/1e3).toFixed(0)}k`:null,loc:j.location||"Remote",src:"RemoteOK",desc:j.description||""}));if(p==="rem")return(d?.jobs||[]).slice(0,12).map(j=>({id:"m"+j.id,t:j.title,co:j.company_name,url:j.url,dt:j.publication_date,tags:[j.category,...(j.tags||[])].filter(Boolean).slice(0,5),sal:j.salary||null,loc:j.candidate_required_location||"Remote",src:"Remotive",desc:j.description||""}));if(p==="abn")return(d?.data||[]).slice(0,12).map(j=>({id:"a"+j.slug,t:j.title,co:j.company_name,url:j.url,dt:j.created_at?new Date(j.created_at*1e3).toISOString():new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:null,loc:j.location||"Remote",src:"Arbeitnow",desc:j.description||""}));return[]}
@@ -63,7 +63,7 @@ export default function App(){
 
   const fetchAll=useCallback(async()=>{
     setLd(true);setFErr([]);setIsDmo(false);let res=[];const errs=[];
-    for(const f of FEEDS){try{const r=await fetch(CORS+encodeURIComponent(f.url));if(!r.ok)throw new Error(`${r.status}`);const d=await r.json();res.push(...parseJ(f.p,d))}catch(e){errs.push({n:f.name,m:e.message})}}
+    for(const f of FEEDS){try{const r=await fetch(f.url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}});if(!r.ok)throw new Error(`${r.status}`);const d=await r.json();res.push(...parseJ(f.p,d))}catch(e){errs.push({n:f.name,m:e.message})}}
     if(errs.length)setFErr(errs);if(!res.length){res=[...DEMO];setIsDmo(true)}
     res.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
     if(seen.size>0){const n=res.filter(j=>!seen.has(j.id));if(n.length){setFresh(new Set(n.map(j=>j.id)));setBanner(n.length);beep();setTimeout(()=>setBanner(null),6e3)}}
