@@ -280,6 +280,18 @@ export default function App(){
 
   useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight},[ivMessages,ivTranscript]);
 
+  // ── KEYBOARD SHORTCUTS ─────────────────────────────────────────────
+  useEffect(()=>{
+    const h=(e)=>{
+      if(e.ctrlKey||e.metaKey){
+        const map={"1":"live","2":"portals","3":"interview","4":"resume_score","5":"alerts","6":"nego","7":"funnel","8":"apply","9":"profile","0":"settings"};
+        if(map[e.key]){e.preventDefault();setTab(map[e.key]);}
+      }
+    };
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
+  },[]);
+
   // ── HELPERS ────────────────────────────────────────────────────────
   const upd=(id,u)=>setPs(p=>({...p,[id]:{...p[id],...u}}));
   const cyc=id=>{const i=ST.indexOf(ps[id].st);upd(id,{st:ST[(i+1)%ST.length]})};
@@ -617,8 +629,8 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
   const doSearch=()=>{setActiveSearch(searchInput);setActiveLocFilter(locFilter)};
 
   // ── THEME ─────────────────────────────────────────────────────────
-  const T={bg:darkMode?"#03040a":"#f0f4f8",fg:darkMode?"#adb5c4":"#1a202c",card:darkMode?"rgba(255,255,255,.012)":"#fff",border:darkMode?"rgba(255,255,255,.025)":"#e2e8f0",input:darkMode?"rgba(255,255,255,.04)":"#f7fafc",muted:darkMode?"#4b5563":"#64748b"};
-  const IS={padding:"9px 12px",borderRadius:8,background:T.input,border:`1px solid ${T.border}`,color:T.fg,fontSize:13,fontFamily:"inherit",width:"100%"};
+  const T={bg:darkMode?"#03040a":"#f0f4f8",fg:darkMode?"#e2e8f0":"#1a202c",card:darkMode?"rgba(255,255,255,.03)":"rgba(255,255,255,.85)",border:darkMode?"rgba(255,255,255,.06)":"#e2e8f0",input:darkMode?"rgba(255,255,255,.05)":"#f7fafc",muted:darkMode?"#6b7280":"#64748b",glass:darkMode?"rgba(255,255,255,.03)":"rgba(255,255,255,.7)"};
+  const IS={padding:"9px 12px",borderRadius:8,background:T.input,border:`1px solid ${T.border}`,color:T.fg,fontSize:13,fontFamily:"inherit",width:"100%",backdropFilter:"blur(8px)",transition:"border-color .2s"};
 
   const TABS=[
     {k:"live",l:"📡 Live Jobs",b:filteredJobs.length,gw:fresh.size>0},
@@ -634,6 +646,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
     {k:"roadmap",l:"🗺️ Roadmap"},
     {k:"research",l:"🔬 Deep Research"},
     {k:"resume_v",l:"🧬 Resume Builder"},
+    {k:"market",l:"📈 Market Intel"},
   ];
 
   // ═══════════════════════════════════════════════════════════════════
@@ -651,15 +664,27 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
         @keyframes nj{0%{background:rgba(16,185,129,.12)}100%{background:transparent}}
         @keyframes sp{to{transform:rotate(360deg)}}
         @keyframes pulse-ring{0%{transform:scale(.9);opacity:1}70%{transform:scale(1.3);opacity:0}100%{transform:scale(.9);opacity:0}}
-        .hv:hover{border-color:rgba(99,102,241,.3)!important;transform:translateY(-1px)}
-        .ab:hover{filter:brightness(1.15);transform:translateY(-1px)}
-        input:focus,textarea:focus,select:focus{border-color:rgba(99,102,241,.4)!important;outline:none}
-        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(99,102,241,.2);border-radius:2px}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        @keyframes glow-pulse{0%,100%{box-shadow:0 0 8px rgba(99,102,241,.2)}50%{box-shadow:0 0 20px rgba(99,102,241,.5),0 0 40px rgba(99,102,241,.15)}}
+        ::selection{background:rgba(99,102,241,.3);color:#fff}
+        .hv:hover{border-color:rgba(99,102,241,.4)!important;transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.12)!important}
+        .ab{transition:all .18s cubic-bezier(.4,0,.2,1)!important}
+        .ab:hover{filter:brightness(1.18);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.2)!important}
+        .ab:active{transform:translateY(0)!important;filter:brightness(.95)}
+        input:focus,textarea:focus,select:focus{border-color:rgba(99,102,241,.5)!important;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(99,102,241,.25);border-radius:2px}
         .nj{animation:nj 3s forwards}
-        .spin{width:13px;height:13px;border:2px solid rgba(99,102,241,.15);border-top-color:#6366f1;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;flex-shrink:0}
+        .spin{width:13px;height:13px;border:2px solid rgba(99,102,241,.12);border-top-color:#6366f1;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;flex-shrink:0}
+        .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.03) 25%,rgba(255,255,255,.07) 50%,rgba(255,255,255,.03) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
         pre.ao{white-space:pre-wrap;word-wrap:break-word;font-size:12px;line-height:1.65;color:${darkMode?"#c9d1d9":T.fg};font-family:'JetBrains Mono',monospace;margin:0}
-        .job-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(99,102,241,.12)}
+        .job-card{transition:all .22s cubic-bezier(.4,0,.2,1)!important;backdrop-filter:blur(8px)}
+        .job-card:hover{transform:translateY(-3px)!important;box-shadow:0 12px 32px rgba(99,102,241,.15),0 0 0 1px rgba(99,102,241,.12)!important}
+        .glass{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+        .tab-btn{transition:all .18s cubic-bezier(.4,0,.2,1)!important}
+        .tab-btn:hover{color:#a5b4fc!important}
         .mic-pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid #ef4444;animation:pulse-ring 1.2s infinite}
+        .market-card{transition:all .2s;cursor:default}.market-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
       `}</style>
 
       <div style={{position:"fixed",inset:0,backgroundImage:"radial-gradient(rgba(99,102,241,.015) 1px,transparent 1px)",backgroundSize:"16px 16px",pointerEvents:"none"}}/>
@@ -703,7 +728,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
         {/* TABS */}
         <div style={{display:"flex",gap:1,marginBottom:14,borderBottom:`1px solid ${T.border}`,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
           {TABS.map(t=>(
-            <button key={t.k} onClick={()=>setTab(t.k)} style={{padding:"10px 14px",border:"none",borderBottom:tab===t.k?"3px solid #6366f1":"3px solid transparent",cursor:"pointer",fontSize:12,fontWeight:tab===t.k?700:400,color:tab===t.k?"#6366f1":T.muted,background:"transparent",whiteSpace:"nowrap",transition:"all .15s",position:"relative"}}>
+            <button key={t.k} onClick={()=>setTab(t.k)} className="tab-btn" style={{padding:"10px 14px",border:"none",borderBottom:tab===t.k?"3px solid #6366f1":"3px solid transparent",cursor:"pointer",fontSize:12,fontWeight:tab===t.k?700:400,color:tab===t.k?"#6366f1":T.muted,background:"transparent",whiteSpace:"nowrap",transition:"all .15s",position:"relative"}}>
               {t.l}
               {t.b!=null&&<span style={{marginLeft:4,fontSize:10,padding:"1px 5px",borderRadius:8,background:tab===t.k?"rgba(99,102,241,.15)":T.input,color:tab===t.k?"#a5b4fc":T.muted}}>{t.b}</span>}
               {t.gw&&<span style={{position:"absolute",top:4,right:4,width:7,height:7,borderRadius:"50%",background:"#10b981",animation:"gw 1.5s infinite"}}/>}
@@ -739,7 +764,13 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
               <button onClick={fetchAll} disabled={loading} style={{padding:"5px 14px",borderRadius:6,cursor:"pointer",fontSize:11,border:"none",background:"rgba(99,102,241,.1)",color:"#a5b4fc",fontWeight:600}}>{loading?"⏳ Fetching...":"🔄 Refresh"}</button>
             </div>
           </div>
-          {loading&&<div style={{textAlign:"center",padding:40}}><div className="spin" style={{width:32,height:32,margin:"0 auto 10px"}}/><p style={{color:T.muted}}>Fetching live DevOps jobs...</p></div>}
+          {loading&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[1,2,3,4,5].map(i=><div key={i} style={{padding:16,borderRadius:10,background:T.card,border:`1px solid ${T.border}`}}>
+              <div className="skeleton" style={{height:18,width:`${60+i*7}%`,marginBottom:8}}/>
+              <div className="skeleton" style={{height:13,width:"40%",marginBottom:12}}/>
+              <div style={{display:"flex",gap:6}}>{[1,2,3].map(j=><div key={j} className="skeleton" style={{height:26,width:80,borderRadius:5}}/>)}</div>
+            </div>)}
+          </div>}
           {!loading&&filteredJobs.length===0&&<div style={{textAlign:"center",padding:60,color:T.muted}}><p style={{fontSize:18,marginBottom:8}}>😕 No jobs found</p><p>Try different search terms</p></div>}
           {!loading&&<>
             <p style={{color:T.muted,fontSize:12,marginBottom:12}}>Showing {filteredJobs.length} of {jobs.length} jobs{activeSearch?` matching "${activeSearch}"`:""}  ·  9 AI tools per job</p>
@@ -1334,8 +1365,86 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
 
       </div>
 
+        {/* ═══ MARKET INTELLIGENCE ══════════════════════════════════════ */}
+        {tab==="market"&&<div style={{animation:"fu .2s"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:6}}>
+            <h2 style={{fontSize:20,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:0}}>📈 Global DevOps Market Intelligence</h2>
+            <span style={{fontSize:10,padding:"3px 10px",borderRadius:10,background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",color:"#6ee7b7",fontWeight:700}}>2026 DATA</span>
+          </div>
+          <p style={{fontSize:13,color:T.muted,marginBottom:20}}>Real market data — where to focus your search for maximum results.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginBottom:20}}>
+            {[{v:"$10B+",l:"Market Size",c:"#6366f1",sub:"19-25% YoY growth"},{v:"8:1",l:"Demand/Supply",c:"#10b981",sub:"Massive talent gap"},{v:"48%",l:"Assessments Up",c:"#f59e0b",sub:"vs 2024"},{v:"90%",l:"US Hiring Up",c:"#ec4899",sub:"vs mid-2023"},{v:"$185k",l:"Senior SRE Avg",c:"#a78bfa",sub:"US full-time"},{v:"$280/hr",l:"Freelance Top",c:"#06b6d4",sub:"Senior specialist"}].map(s=>(
+              <div key={s.l} className="market-card glass" style={{padding:16,borderRadius:12,background:T.card,border:`1px solid ${T.border}`,borderTop:`3px solid ${s.c}`}}>
+                <div style={{fontSize:26,fontWeight:800,color:s.c,letterSpacing:"-1px"}}>{s.v}</div>
+                <div style={{fontSize:12,fontWeight:600,color:darkMode?"#e0e7ff":T.fg,margin:"4px 0 2px"}}>{s.l}</div>
+                <div style={{fontSize:10,color:T.muted}}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{padding:18,borderRadius:12,background:T.card,border:"1px solid rgba(99,102,241,.2)",marginBottom:14}}>
+            <h3 style={{fontSize:15,fontWeight:700,color:"#a5b4fc",margin:"0 0 14px"}}>🔥 Target These Titles (Highest Demand 2026)</h3>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:10}}>
+              {[{role:"Platform Engineer",postings:"1,035",trend:"↑ Outpacing DevOps",c:"#10b981",why:"Builds internal dev platforms. Hottest in US.",match:"99%"},{role:"DevSecOps Engineer",postings:"850+",trend:"↑ 27% demand surge",c:"#6366f1",why:"Security in pipeline. Healthcare/finance top pay.",match:"98%"},{role:"Site Reliability Engineer",postings:"788",trend:"↑ Stable premium",c:"#f59e0b",why:"Owns production stability. Top salary tier.",match:"95%"},{role:"Cloud Infrastructure Eng",postings:"650+",trend:"↑ Multi-cloud boom",c:"#ec4899",why:"Foundational cloud — networking, IAM, scaling.",match:"93%"}].map(r=>(
+                <div key={r.role} className="market-card" style={{padding:14,borderRadius:10,background:darkMode?"rgba(255,255,255,.015)":"rgba(0,0,0,.02)",border:`1px solid ${r.c}20`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                    <div style={{fontSize:14,fontWeight:700,color:darkMode?"#e0e7ff":T.fg}}>{r.role}</div>
+                    <span style={{fontSize:10,padding:"2px 7px",borderRadius:6,background:`${r.c}15`,color:r.c,fontWeight:700}}>{r.match}</span>
+                  </div>
+                  <div style={{fontSize:11,color:r.c,fontWeight:600,marginBottom:4}}>{r.trend} · {r.postings} postings</div>
+                  <div style={{fontSize:11,color:T.muted,lineHeight:1.4}}>{r.why}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <div style={{padding:16,borderRadius:12,background:T.card,border:`1px solid ${T.border}`}}>
+              <h3 style={{fontSize:14,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 12px"}}>🌍 Active Postings by Region</h3>
+              {[{region:"🌐 Remote (Global)",count:"5,000+",hot:"Worldwide",c:"#06b6d4",w:100},{region:"🇮🇳 India",count:"3,000+",hot:"Bangalore, Hyderabad",c:"#a78bfa",w:95},{region:"🇬🇧 United Kingdom",count:"2,800+",hot:"London (70%)",c:"#10b981",w:90},{region:"🇺🇸 United States",count:"1,800+",hot:"NY, SF, Remote",c:"#6366f1",w:75},{region:"🇳🇱 Netherlands",count:"500+",hot:"Amsterdam (60%)",c:"#f59e0b",w:35},{region:"🇩🇪 Germany",count:"400+",hot:"Berlin, Munich",c:"#ec4899",w:28}].map(r=>(
+                <div key={r.region} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:12,color:darkMode?"#e0e7ff":T.fg}}>{r.region}</span>
+                    <span style={{fontSize:11,fontWeight:700,color:r.c}}>{r.count}</span>
+                  </div>
+                  <div style={{height:5,borderRadius:3,background:T.border,overflow:"hidden"}}><div style={{height:"100%",width:`${r.w}%`,borderRadius:3,background:r.c}}/></div>
+                  <div style={{fontSize:10,color:T.muted,marginTop:2}}>{r.hot}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{padding:16,borderRadius:12,background:"rgba(16,185,129,.05)",border:"1px solid rgba(16,185,129,.15)",flex:1}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:"#6ee7b7",margin:"0 0 10px"}}>✅ Your Skills vs Market Demand</h3>
+                {[["EKS + Kubernetes","Platform Eng #1 req"],["Terraform + IaC","All roles priority"],["Falco + Kyverno","DevSecOps rare skill"],["Istio Service Mesh","Platform premium"],["SOC2/HIPAA","Healthcare niche"],["ArgoCD GitOps","High demand 2026"]].map(([skill,note])=>(
+                  <div key={skill} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${T.border}`}}>
+                    <span style={{fontSize:12,color:darkMode?"#e0e7ff":T.fg,fontWeight:600}}>{skill}</span>
+                    <span style={{fontSize:10,color:"#6ee7b7"}}>✓ {note}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{padding:16,borderRadius:12,background:"rgba(245,158,11,.05)",border:"1px solid rgba(245,158,11,.15)"}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:"#fbbf24",margin:"0 0 8px"}}>💡 Strategic Moves</h3>
+                {["Lead with 'Platform Engineer' title — outpacing DevOps","Emphasize resilient systems over tool lists","Target UK (2,800+ roles) + Remote-first","Highlight HIPAA/SOC2 — rare premium skill","Add Business Impact block to resume"].map((t,i)=>(
+                  <div key={i} style={{fontSize:11,color:T.muted,padding:"4px 0",borderBottom:i<4?`1px solid ${T.border}`:"none",lineHeight:1.4}}><span style={{color:"#fbbf24",marginRight:6}}>{i+1}.</span>{t}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{padding:18,borderRadius:12,background:T.card,border:`1px solid ${T.border}`}}>
+            <h3 style={{fontSize:15,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 14px"}}>💰 2026 Salary Bands — Senior DevOps / SRE / Platform</h3>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
+              {[{tier:"FAANG / Big Tech",base:"$180k–$240k",total:"$300k–$500k+",c:"#10b981"},{tier:"Series B-D Startup",base:"$150k–$200k",total:"$200k–$350k",c:"#6366f1"},{tier:"Mid-Market",base:"$125k–$170k",total:"$140k–$210k",c:"#f59e0b"},{tier:"Consulting",base:"$100k–$140k",total:"$110k–$160k",c:"#6b7280"},{tier:"Freelance / Contract",base:"$180–$280/hr",total:"Unlimited",c:"#ec4899"},{tier:"India (Remote USD)",base:"$40k–$90k",total:"+ Equity possible",c:"#a78bfa"}].map(s=>(
+                <div key={s.tier} style={{padding:12,borderRadius:8,background:darkMode?"rgba(255,255,255,.015)":"rgba(0,0,0,.02)",border:`1px solid ${s.c}15`}}>
+                  <div style={{fontSize:10,color:s.c,fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{s.tier}</div>
+                  <div style={{fontSize:16,fontWeight:800,color:darkMode?"#e0e7ff":T.fg}}>{s.base}</div>
+                  <div style={{fontSize:10,color:T.muted,marginTop:2}}>Total: {s.total}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{fontSize:10,color:T.muted,marginTop:12,textAlign:"center"}}>Source: Market analysis Q1 2026 · Levels.fyi · LinkedIn Salary · Glassdoor</p>
+          </div>
+        </div>}
+
       <footer style={{textAlign:"center",padding:"14px 0 6px",borderTop:`1px solid ${T.border}`,color:T.muted,fontSize:11,marginTop:20}}>
-        {profile.name} · FindMyJobs.store · Job Hunt Command Center v12 · {new Date().getFullYear()}
+        {profile.name} · FindMyJobs.store · Job Hunt Command Center v13 · {new Date().getFullYear()}
       </footer>
     </div>
   );
