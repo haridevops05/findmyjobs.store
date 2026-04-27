@@ -109,22 +109,26 @@ const AI_LABELS={score:"Match Analysis",cover:"Cover Letter",interview:"Intervie
 function safeBeep(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;const c=new A();(c.state==="suspended"?c.resume():Promise.resolve()).then(()=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;o.type="sine";g.gain.setValueAtTime(.1,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.3);o.start();o.stop(c.currentTime+.3);o.onended=()=>c.close()}).catch(()=>{})}catch{}}
 
 async function callAI(prompt,maxTokens=1200){
-  try{
-    const k=localStorage.getItem("fmj_api_key");
-    if(!k)return"⚠️ Gemini API Key not set.\n\nGo to ⚙️ Settings tab → enter your Gemini API key.\nGet a FREE key at: https://aistudio.google.com/app/apikey\n(No credit card required!)";
-    // Gemini 2.0 Flash — free tier: 15 req/min, 1500 req/day
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${k}`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        contents:[{parts:[{text:prompt}]}],
-        generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}
-      })
-    });
-    if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`HTTP ${r.status}`)}
-    const d=await r.json();
-    return d.candidates?.[0]?.content?.parts?.[0]?.text||"No response";
-  }catch(e){return`AI Error: ${e.message}`}
+  const k=localStorage.getItem("fmj_api_key");
+  if(!k)return"⚠️ Gemini API Key not set.\n\nGo to ⚙️ Settings tab → enter your Gemini API key.\nGet a FREE key at: https://aistudio.google.com/app/apikey\n(No credit card required!)";
+  // Try models in order — fallback if rate limited
+  const MODELS=["gemini-1.5-flash-latest","gemini-1.5-flash","gemini-1.0-pro"];
+  for(const model of MODELS){
+    try{
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${k}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          contents:[{parts:[{text:prompt}]}],
+          generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}
+        })
+      });
+      if(!r.ok){const e=await r.json();const msg=e.error?.message||"";if(msg.includes("quota")||msg.includes("rate")||msg.includes("limit")){console.warn(`${model} rate limited, trying next...`);continue;}throw new Error(msg||`HTTP ${r.status}`)}
+      const d=await r.json();
+      return d.candidates?.[0]?.content?.parts?.[0]?.text||"No response";
+    }catch(e){if(e.message.includes("quota")||e.message.includes("rate")||e.message.includes("limit")){continue;}return`AI Error: ${e.message}`}
+  }
+  return"⚠️ All Gemini models are rate limited right now.\nFree tier: 15 requests/minute.\nPlease wait 1 minute and try again.";
 }
 
 function ago(d){if(!d)return"—";const m=Math.floor((Date.now()-new Date(d).getTime())/6e4);if(m<1)return"now";if(m<60)return m+"m";const h=Math.floor(m/60);return h<24?h+"h":Math.floor(h/24)+"d";}
@@ -952,7 +956,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
               <h3 style={{fontSize:15,margin:0,color:"#6ee7b7"}}>🔑 Gemini API Key</h3>
               <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(16,185,129,.15)",color:"#10b981",fontWeight:700}}>100% FREE</span>
             </div>
-            <p style={{fontSize:12,color:T.muted,marginBottom:10}}>Powered by Google Gemini 2.0 Flash — completely free, no credit card required.</p>
+            <p style={{fontSize:12,color:T.muted,marginBottom:10}}>Powered by Google Gemini — completely free, no credit card required. Auto-retries if rate limited.</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
               {[{i:"✅",l:"No credit card"},{i:"⚡",l:"1,500 req/day free"},{i:"🔒",l:"Stored in browser only"}].map(x=>(
                 <div key={x.l} style={{padding:"8px 10px",borderRadius:6,background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.12)",fontSize:11,color:"#6ee7b7",textAlign:"center"}}>{x.i} {x.l}</div>
