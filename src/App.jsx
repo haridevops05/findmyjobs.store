@@ -19,15 +19,21 @@ const DP={
   avail:"Immediate Joiner — Remote/Hybrid/Relocation",
 };
 
+// CORS proxy — fixes "Failed to fetch" on live domain
+const CORS="https://api.allorigins.win/raw?url=";
+// DevOps/AWS keyword whitelist — blocks unrelated jobs
+const DEVOPS_KW=["devops","aws","kubernetes","k8s","terraform","cloud","sre","platform engineer","infrastructure","devsecops","gitops","argocd","helm","docker","eks","azure","gcp","ansible","ci/cd","jenkins","gitlab","github actions","openshift","site reliability","cloud engineer","cloud architect","cloud infra"];
+function isDevOps(t,tags,desc){const h=(t+" "+(tags||[]).join(" ")+" "+(desc||"").slice(0,200)).toLowerCase();return DEVOPS_KW.some(k=>h.includes(k));}
 const FEEDS=[
   {id:"remoteok",name:"RemoteOK",url:"https://remoteok.com/api?tag=devops",p:"rok"},
-  {id:"remotive",name:"Remotive",url:"https://remotive.com/api/remote-jobs?category=devops",p:"rem"},
-  {id:"arbeitnow",name:"Arbeitnow",url:"https://www.arbeitnow.com/api/job-board-api?search=devops",p:"abn"},
+  {id:"remoteok2",name:"RemoteOK AWS",url:"https://remoteok.com/api?tag=aws",p:"rok"},
+  {id:"remotive",name:"Remotive",url:"https://remotive.com/api/remote-jobs?category=devops-sysadmin",p:"rem"},
+  {id:"arbeitnow",name:"Arbeitnow",url:"https://www.arbeitnow.com/api/job-board-api?search=devops+aws+kubernetes",p:"abn"},
 ];
 function parseJ(p,d){
-  if(p==="rok")return(Array.isArray(d)?d:[]).filter(j=>j.position).slice(0,15).map(j=>({id:"r"+j.id,t:j.position,co:j.company||"?",url:j.url||"https://remoteok.com",dt:j.date||new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:j.salary_min?`$${(j.salary_min/1e3).toFixed(0)}k–$${(j.salary_max/1e3).toFixed(0)}k`:null,loc:j.location||"Remote",src:"RemoteOK",desc:j.description||""}));
-  if(p==="rem")return(d?.jobs||[]).slice(0,15).map(j=>({id:"m"+j.id,t:j.title,co:j.company_name,url:j.url,dt:j.publication_date,tags:[j.category,...(j.tags||[])].filter(Boolean).slice(0,5),sal:j.salary||null,loc:j.candidate_required_location||"Remote",src:"Remotive",desc:j.description||""}));
-  if(p==="abn")return(d?.data||[]).slice(0,15).map(j=>({id:"a"+j.slug,t:j.title,co:j.company_name,url:j.url,dt:j.created_at?new Date(j.created_at*1e3).toISOString():new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:null,loc:j.location||"Remote",src:"Arbeitnow",desc:j.description||""}));
+  if(p==="rok")return(Array.isArray(d)?d:[]).filter(j=>j.position&&isDevOps(j.position,j.tags,"")).slice(0,20).map(j=>({id:"r"+j.id,t:j.position,co:j.company||"?",url:j.url||"https://remoteok.com",dt:j.date||new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:j.salary_min?`$${(j.salary_min/1e3).toFixed(0)}k–$${(j.salary_max/1e3).toFixed(0)}k`:null,loc:j.location||"Remote (Worldwide)",src:"RemoteOK",desc:j.description||""}));
+  if(p==="rem")return(d?.jobs||[]).filter(j=>isDevOps(j.title,[j.category],j.description)).slice(0,20).map(j=>({id:"m"+j.id,t:j.title,co:j.company_name,url:j.url,dt:j.publication_date,tags:[j.category,...(j.tags||[])].filter(Boolean).slice(0,5),sal:j.salary||null,loc:j.candidate_required_location||"Remote (Worldwide)",src:"Remotive",desc:j.description||""}));
+  if(p==="abn")return(d?.data||[]).filter(j=>isDevOps(j.title,j.tags,"")).slice(0,20).map(j=>({id:"a"+j.slug,t:j.title,co:j.company_name,url:j.url,dt:j.created_at?new Date(j.created_at*1e3).toISOString():new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:null,loc:j.location||"Remote (Worldwide)",src:"Arbeitnow",desc:j.description||""}));
   return[];
 }
 const DEMO=[
@@ -106,8 +112,8 @@ async function callAI(prompt,maxTokens=1200){
   try{
     const k=localStorage.getItem("fmj_api_key");
     if(!k)return"⚠️ Gemini API Key not set.\n\nGo to ⚙️ Settings tab → enter your Gemini API key.\nGet a FREE key at: https://aistudio.google.com/app/apikey\n(No credit card required!)";
-    // Gemini 1.5 Flash — free tier: 15 req/min, 1500 req/day
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${k}`,{
+    // Gemini 2.0 Flash — free tier: 15 req/min, 1500 req/day
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${k}`,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -379,7 +385,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
   // ── JOB FEED ──────────────────────────────────────────────────────
   const fetchAll=useCallback(async()=>{
     setLoading(true);setFErr([]);setDemo(false);let res=[];const errs=[];
-    for(const f of FEEDS){try{const r=await fetch(f.url);if(!r.ok)throw new Error(`${r.status}`);const d=await r.json();res.push(...parseJ(f.p,d))}catch(e){errs.push({n:f.name,m:e.message})}}
+    for(const f of FEEDS){try{const r=await fetch(CORS+encodeURIComponent(f.url));if(!r.ok)throw new Error(`${r.status}`);const d=await r.json();res.push(...parseJ(f.p,d))}catch(e){errs.push({n:f.name,m:e.message})}}
     if(errs.length)setFErr(errs);if(!res.length){res=[...DEMO];setDemo(true)}
     res.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
     const uniq=new Map();res.forEach(j=>uniq.set(j.url,j));res=[...uniq.values()];
@@ -946,7 +952,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
               <h3 style={{fontSize:15,margin:0,color:"#6ee7b7"}}>🔑 Gemini API Key</h3>
               <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(16,185,129,.15)",color:"#10b981",fontWeight:700}}>100% FREE</span>
             </div>
-            <p style={{fontSize:12,color:T.muted,marginBottom:10}}>Powered by Google Gemini 1.5 Flash — completely free, no credit card required.</p>
+            <p style={{fontSize:12,color:T.muted,marginBottom:10}}>Powered by Google Gemini 2.0 Flash — completely free, no credit card required.</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
               {[{i:"✅",l:"No credit card"},{i:"⚡",l:"1,500 req/day free"},{i:"🔒",l:"Stored in browser only"}].map(x=>(
                 <div key={x.l} style={{padding:"8px 10px",borderRadius:6,background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.12)",fontSize:11,color:"#6ee7b7",textAlign:"center"}}>{x.i} {x.l}</div>
