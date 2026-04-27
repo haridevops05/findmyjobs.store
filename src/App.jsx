@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
-   FINDMYJOBS.STORE — COMMAND CENTER v10
+   FINDMYJOBS.STORE — COMMAND CENTER v11
    NEW: 📄 Resume Score Tab | 🎙️ Natural Voice-to-Voice Interview
    KEPT: All v9 features — 29 Portals, 9 AI Tools, Live Feed,
    Negotiation AI, Analytics, Quick Apply, Profile, Roadmap
@@ -197,6 +197,32 @@ export default function App(){
   const[resumeTarget,setResumeTarget]=useState("Senior DevOps Engineer"); // target role
   const resumeFileRef=useRef(null);
 
+  // ── DEEP RESEARCH STATE ───────────────────────────────────────────
+  const[researchJob,setResearchJob]=useState(null);
+  const[researchOut,setResearchOut]=useState({});
+  const[researchLoad,setResearchLoad]=useState(null);
+
+  // ── RESUME VERSIONING STATE ────────────────────────────────────────
+  const[resumeBlocks,setResumeBlocks]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("fmj_rblocks")||"null")||[
+      {id:"b1",cat:"CI/CD",title:"CI/CD Pipeline Transformation @ Brillio",content:"Redesigned GitLab CI/CD pipelines cutting build time from 45min→8min (82%) and CI costs $1,500→$300/mo. Implemented parallel stages, Docker layer caching, and incremental testing across 15+ microservices.",tags:["gitlab","ci/cd","docker","jenkins"],impact:"82% faster builds, 80% cost reduction"},
+      {id:"b2",cat:"Kubernetes",title:"AWS EKS Production Platform @ Brillio",content:"Architected and managed multi-cluster AWS EKS running 20+ microservices at 99.9% uptime. Implemented Karpenter autoscaling, Helm chart standardization, and GitOps workflows with ArgoCD.",tags:["eks","kubernetes","argocd","helm"],impact:"99.9% uptime, 15+ daily deploys"},
+      {id:"b3",cat:"DevSecOps",title:"DevSecOps Hardening — SOC2/HIPAA @ Brillio",content:"Led security hardening for HIPAA-compliant healthcare platform. Deployed Falco runtime security, Kyverno policy engine, Kube-Bench CIS compliance. Achieved CIS benchmark score 67%→94%. Zero hardcoded secrets via ESO+Vault.",tags:["falco","kyverno","trivy","vault","hipaa","soc2"],impact:"CIS 94/100, zero secrets violations"},
+      {id:"b4",cat:"Service Mesh",title:"Istio Service Mesh Implementation @ Brillio",content:"Deployed Istio service mesh across production EKS clusters. Implemented mTLS between all services, traffic management with Argo Rollouts (canary/blue-green), and distributed tracing via Jaeger/Kiali.",tags:["istio","envoy","jaeger","kiali","mtls"],impact:"100% mTLS coverage, zero-downtime deployments"},
+      {id:"b5",cat:"Observability",title:"Full-Stack Observability Platform @ Brillio",content:"Built end-to-end observability: Prometheus+Grafana for metrics, EFK for logs, Jaeger for tracing, Datadog for APM. Reduced MTTR from 2hrs→15min (87%). Created 40+ runbooks for on-call team.",tags:["prometheus","grafana","datadog","opentelemetry"],impact:"87% MTTR reduction, 40+ runbooks"},
+      {id:"b6",cat:"IaC",title:"Terraform Infrastructure Automation @ Brillio",content:"Managed 50+ Terraform modules for AWS infrastructure (VPC, EKS, RDS, ElastiCache). Implemented remote state with S3+DynamoDB locking, modular design for multi-env (dev/staging/prod), Terragrunt DRY principles.",tags:["terraform","aws","iac","terragrunt"],impact:"100% IaC coverage, 3 environments"},
+      {id:"b7",cat:"MLOps",title:"MLOps Platform — ML Retraining Pipeline @ Brillio",content:"Built Kubeflow-based MLOps platform reducing ML model retraining from 2 weeks→30min. Automated data pipelines with Apache Airflow, model versioning via MLflow, GPU node auto-provisioning.",tags:["mlops","kubeflow","airflow","mlflow"],impact:"ML training 2 weeks→30min"},
+      {id:"b8",cat:"Incident Response",title:"Incident Response & SRE Practices @ Brillio",content:"Led SRE practices: defined SLOs/SLIs/error budgets for 20+ services. Built automated incident runbooks cutting P1 MTTR to 5min for known issues. Conducted blameless post-mortems, reduced repeat incidents by 60%.",tags:["sre","incident","slo","sli"],impact:"P1 MTTR 5min, 60% fewer repeats"},
+    ]}catch{return[]}
+  });
+  const[selectedBlocks,setSelectedBlocks]=useState([]);
+  const[rvJob,setRvJob]=useState("");
+  const[rvOut,setRvOut]=useState("");
+  const[rvLoad,setRvLoad]=useState(false);
+  const[rvPdf,setRvPdf]=useState(false);
+  const[editingBlock,setEditingBlock]=useState(null);
+  const[newBlock,setNewBlock]=useState(null);
+
   // ── VOICE INTERVIEW STATE ──────────────────────────────────────────
   const[ivActive,setIvActive]=useState(false);
   const[ivRole,setIvRole]=useState("Senior DevOps Engineer");
@@ -219,6 +245,7 @@ export default function App(){
   useEffect(()=>{localStorage.setItem("fmj_seen",JSON.stringify([...seen]))},[seen]);
   useEffect(()=>{localStorage.setItem("fmj_scores",JSON.stringify(scores))},[scores]);
   useEffect(()=>{localStorage.setItem("fmj_ps",JSON.stringify(ps))},[ps]);
+  useEffect(()=>{localStorage.setItem("fmj_rblocks",JSON.stringify(resumeBlocks))},[resumeBlocks]);
 
   useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight},[ivMessages,ivTranscript]);
 
@@ -227,6 +254,118 @@ export default function App(){
   const cyc=id=>{const i=ST.indexOf(ps[id].st);upd(id,{st:ST[(i+1)%ST.length]})};
   const cp=async(t,f)=>{try{await navigator.clipboard.writeText(t);setCpd(f);setTimeout(()=>setCpd(null),2e3)}catch{}};
   const profStr=()=>`${profile.name} | ${profile.title} | ${profile.exp}\nSkills: ${profile.skills}\nCerts: ${profile.certs}\nMetrics: ${profile.highlights}\nCurrent: ${profile.current}\nSummary: ${profile.sum}`;
+
+  // ── DEEP RESEARCH ──────────────────────────────────────────────────
+  const runDeepResearch=async(job)=>{
+    setResearchJob(job.id);setResearchLoad(job.id);
+    const cached=researchOut[job.id];if(cached){setResearchLoad(null);return;}
+    // Step 1: Use Gemini to research the company via its knowledge
+    const r=await callAI(`You are an elite tech researcher. Deeply research this company and role for a candidate preparing to apply and interview.
+
+COMPANY: ${job.co}
+ROLE: ${job.t}
+JD SNIPPET: ${(job.desc||"").slice(0,400)}
+
+Provide a comprehensive intelligence report:
+
+🏢 COMPANY SNAPSHOT
+- What they do, size, stage (startup/scale-up/enterprise), founded
+- Recent funding rounds or major news (last 12 months)
+- Key investors or acquirers if any
+
+💻 TECH STACK INTELLIGENCE
+- Known infrastructure/DevOps stack (AWS/GCP/Azure, K8s, CI/CD tools)
+- Engineering blog insights if known
+- Open source contributions or GitHub activity
+
+📈 GROWTH SIGNALS
+- Hiring surge indicators
+- Product launches or expansions
+- Recent press or announcements
+
+🎯 WHY THEY'RE HIRING THIS ROLE
+- What pain point this role likely solves
+- Team structure guess based on role
+
+🗣️ INTERVIEW POWER MOVES
+- 3 specific talking points to mention (reference their tech choices)
+- 1 smart question to ask that shows deep research
+- How to position Hari's experience for maximum impact
+
+⚠️ RED FLAGS TO WATCH
+- Anything concerning about culture, stability, or role scope
+
+Be specific. Use your knowledge of ${job.co}. If you don't know specifics, say so and give educated guesses based on company type/size.`,1800);
+    setResearchOut(prev=>({...prev,[job.id]:r}));
+    setResearchLoad(null);
+  };
+
+  // ── RESUME VERSIONING ───────────────────────────────────────────────
+  const runResumeVersion=async()=>{
+    if(!rvJob.trim())return;setRvLoad(true);setRvOut("");
+    const blockList=resumeBlocks.map((b,i)=>`[${i+1}] ${b.cat}: ${b.title}
+Tags: ${b.tags.join(", ")}
+Impact: ${b.impact}`).join("
+
+");
+    const r=await callAI(`You are an elite resume strategist and ATS expert specializing in DevOps/Cloud roles.
+
+TARGET JOB: ${rvJob}
+
+CANDIDATE: ${profStr()}
+
+AVAILABLE EXPERIENCE BLOCKS (${resumeBlocks.length} total):
+${blockList}
+
+TASK:
+1. BLOCK SELECTION — Pick the 5 BEST blocks for this specific role. For each:
+   - Block number and title
+   - Why it matches (specific JD keywords it covers)
+   - How to lead with it
+
+2. TAILORED RESUME SUMMARY — Write a 3-sentence ATS-optimized summary specifically for "${rvJob}"
+
+3. SKILLS SECTION — List 15 most relevant skills for this role from candidate's stack, ranked by importance
+
+4. ATS KEYWORDS TO ADD — 10 keywords from the JD to weave into the selected blocks
+
+5. OPENING LINE — Write a powerful 1-line headline for this specific application
+
+6. BLOCK OPTIMIZATION — For each selected block, suggest ONE specific tweak to maximize relevance
+
+Format clearly with headers. Be specific, not generic.`,1800);
+    setRvOut(r);setRvLoad(false);
+  };
+
+  const generatePDF=()=>{
+    const selectedB=resumeBlocks.filter((_,i)=>selectedBlocks.includes(i));
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>
+      body{font-family:Georgia,serif;max-width:850px;margin:0 auto;padding:40px;color:#1a1a1a;font-size:13px;line-height:1.5}
+      h1{font-size:22px;margin:0;color:#1a1a1a}h2{font-size:11px;color:#6366f1;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 2px;font-family:Arial,sans-serif}
+      .contact{font-size:11px;color:#555;margin:4px 0 16px}
+      .section{margin:14px 0}.section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;color:#6366f1;border-bottom:1.5px solid #6366f1;padding-bottom:2px;margin-bottom:8px;font-family:Arial,sans-serif}
+      .block{margin-bottom:10px}.block-title{font-weight:bold;font-size:13px}.block-cat{font-size:10px;color:#6366f1;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1px}
+      .block-content{font-size:12px;color:#333;margin:3px 0}.block-impact{font-size:11px;color:#10b981;font-weight:bold}
+      .tags{margin-top:3px}.tag{display:inline-block;background:#f0f4ff;color:#6366f1;border-radius:3px;padding:1px 5px;font-size:9px;margin:1px;font-family:Arial,sans-serif}
+      .skills{display:flex;flex-wrap:wrap;gap:4px}.skill{background:#f0f4ff;color:#6366f1;border-radius:4px;padding:3px 8px;font-size:11px;font-family:Arial,sans-serif}
+      .summary{font-size:13px;color:#333;border-left:3px solid #6366f1;padding-left:10px;margin:8px 0}
+      @media print{body{padding:20px}}
+    </style></head><body>
+      <h1>${profile.name}</h1>
+      <h2>${profile.title}</h2>
+      <div class="contact">${profile.email} · ${profile.phone} · ${profile.loc} · linkedin.com/${profile.li} · ${profile.web}</div>
+      <div class="section"><div class="section-title">Summary</div><div class="summary">${profile.sum}</div></div>
+      <div class="section"><div class="section-title">Key Metrics</div><div class="summary" style="border-color:#10b981;font-size:12px;color:#10b981">${profile.highlights}</div></div>
+      <div class="section"><div class="section-title">Selected Experience${rvJob?` — Tailored for ${rvJob}`:""}</div>
+        ${selectedB.map(b=>`<div class="block"><div class="block-cat">${b.cat}</div><div class="block-title">${b.title}</div><div class="block-content">${b.content}</div><div class="block-impact">📈 ${b.impact}</div><div class="tags">${b.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div></div>`).join("")}
+      </div>
+      <div class="section"><div class="section-title">Technical Skills</div><div class="skills">${profile.skills.split(",").map(s=>`<span class="skill">${s.trim()}</span>`).join("")}</div></div>
+      <div class="section"><div class="section-title">Certifications</div><p style="font-size:12px">${profile.certs}</p></div>
+      <div class="section"><div class="section-title">Availability</div><p style="font-size:12px">${profile.avail}</p></div>
+    </body></html>`;
+    const w=window.open("","_blank");w.document.write(html);w.document.close();
+    setTimeout(()=>{w.print();},500);
+  };
 
   // ── TTS ────────────────────────────────────────────────────────────
   const speak=useCallback((text,onEnd)=>{
@@ -462,6 +601,8 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
     {k:"profile",l:"👤 Profile"},
     {k:"settings",l:"⚙️ Settings"},
     {k:"roadmap",l:"🗺️ Roadmap"},
+    {k:"research",l:"🔬 Deep Research"},
+    {k:"resume_v",l:"🧬 Resume Builder"},
   ];
 
   // ═══════════════════════════════════════════════════════════════════
@@ -505,7 +646,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#6366f1,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>⚡</div>
             <div>
-              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v10</span></h1>
+              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v11</span></h1>
               <p style={{fontSize:11,color:T.muted,margin:0}}>{profile.name} · {profile.avail}</p>
             </div>
           </div>
@@ -593,7 +734,16 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
                     {AI_BTNS.map(a=>(
                       <button key={a.ty} onClick={()=>runAI(j,a.ty)} className="ab" style={{padding:"4px 10px",borderRadius:5,cursor:"pointer",fontSize:11,fontWeight:500,background:aiJob===j.id&&aiType===a.ty?`${a.c}18`:`${a.c}08`,border:`1px solid ${aiJob===j.id&&aiType===a.ty?`${a.c}35`:`${a.c}15`}`,color:a.c,transition:"all .15s"}}>{a.lb}</button>
                     ))}
+                    <button onClick={()=>runDeepResearch(j)} className="ab" style={{padding:"4px 10px",borderRadius:5,cursor:"pointer",fontSize:11,fontWeight:600,background:researchJob===j.id?"rgba(139,92,246,.18)":"rgba(139,92,246,.07)",border:`1px solid ${researchJob===j.id?"rgba(139,92,246,.4)":"rgba(139,92,246,.15)"}`,color:"#a78bfa",transition:"all .15s"}}>{researchLoad===j.id?"⏳":"🔬"} Deep Research</button>
                   </div>
+                  {researchJob===j.id&&<div style={{marginTop:8,padding:10,borderRadius:6,background:"rgba(139,92,246,.04)",border:"1px solid rgba(139,92,246,.12)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontSize:12,fontWeight:600,color:"#a78bfa"}}>🔬 Company Intelligence — {j.co}</span>
+                      <button onClick={()=>setResearchJob(null)} style={{padding:"1px 7px",borderRadius:3,cursor:"pointer",fontSize:10,background:"transparent",border:"1px solid rgba(255,255,255,.06)",color:"#6b7280"}}>✕</button>
+                    </div>
+                    {researchLoad===j.id?<div style={{display:"flex",alignItems:"center",gap:8,padding:8}}><div className="spin"/><span style={{fontSize:12,color:"#a78bfa"}}>Researching {j.co}...</span></div>
+                    :<pre className="ao" style={{fontSize:11}}>{researchOut[j.id]||"Click Deep Research to analyze"}</pre>}
+                  </div>}
                 </div>
                 {aiO&&<div style={{margin:"2px 0 0",padding:14,borderRadius:"0 0 10px 10px",background:"rgba(99,102,241,.03)",border:`1px solid rgba(99,102,241,.1)`,borderTop:"none"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -982,6 +1132,89 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
           </div>
         </div>}
 
+                {tab==="research"&&<div style={{animation:"fu .2s"}}>
+          <h2 style={{fontSize:18,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 4px"}}>🔬 Deep Research Agent</h2>
+          <p style={{fontSize:13,color:T.muted,marginBottom:20}}>Click "🔬 Deep Research" on any job card in the Live Jobs tab to get company intel, tech stack, interview power moves, and personalized talking points. Results cached so they reload instantly.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:12}}>
+            {Object.entries(researchOut).map(([jid,report])=>{
+              const job=jobs.find(j=>j.id===jid);if(!job)return null;
+              return(<div key={jid} style={{padding:14,borderRadius:10,background:T.card,border:"1px solid rgba(139,92,246,.2)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div><div style={{fontWeight:700,color:darkMode?"#e0e7ff":T.fg,fontSize:13}}>{job.t}</div><div style={{fontSize:11,color:T.muted}}>{job.co}</div></div>
+                  <button onClick={()=>setResearchOut(prev=>{const n={...prev};delete n[jid];return n})} style={{padding:"1px 7px",borderRadius:3,cursor:"pointer",fontSize:10,background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.1)",color:"#f87171"}}>✕</button>
+                </div>
+                <pre className="ao" style={{fontSize:10,maxHeight:300,overflow:"auto"}}>{report}</pre>
+              </div>);
+            })}
+          </div>
+          {Object.keys(researchOut).length===0&&<div style={{textAlign:"center",padding:60,color:T.muted}}>
+            <div style={{fontSize:40,marginBottom:12}}>🔬</div>
+            <p style={{fontSize:16,marginBottom:6}}>No research reports yet</p>
+            <p style={{fontSize:13}}>Go to <b>📡 Live Jobs</b> and click <b style={{color:"#a78bfa"}}>🔬 Deep Research</b> on any job card</p>
+          </div>}
+        </div>}
+
+        {tab==="resume_v"&&<div style={{animation:"fu .2s"}}>
+          <h2 style={{fontSize:18,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 4px"}}>🧬 Resume Genetic Builder</h2>
+          <p style={{fontSize:13,color:T.muted,marginBottom:16}}>Modular experience blocks — AI picks the 5 best for any role and generates a tailored PDF in one click.</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:0}}>📦 Block Library ({resumeBlocks.length})</h3>
+                <button onClick={()=>setNewBlock({cat:"",title:"",content:"",tags:[],impact:""})} style={{padding:"4px 12px",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:600,background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",color:"#6ee7b7"}}>+ New Block</button>
+              </div>
+              {newBlock&&<div style={{padding:12,borderRadius:8,background:T.card,border:`1px solid ${T.border}`,marginBottom:10}}>
+                {[{k:"cat",l:"Category"},{k:"title",l:"Title"},{k:"impact",l:"Impact Metric"}].map(f=><div key={f.k} style={{marginBottom:6}}><div style={{fontSize:10,color:T.muted,marginBottom:2}}>{f.l}</div><input value={newBlock[f.k]} onChange={e=>setNewBlock(b=>({...b,[f.k]:e.target.value}))} style={{...IS,fontSize:11,padding:"5px 8px"}}/></div>)}
+                <div style={{marginBottom:6}}><div style={{fontSize:10,color:T.muted,marginBottom:2}}>Content</div><textarea value={newBlock.content} onChange={e=>setNewBlock(b=>({...b,content:e.target.value}))} rows={3} style={{...IS,fontSize:11,padding:"5px 8px",resize:"vertical"}}/></div>
+                <div style={{marginBottom:8}}><div style={{fontSize:10,color:T.muted,marginBottom:2}}>Tags (comma separated)</div><input value={newBlock.tags?.join(",")||""} onChange={e=>setNewBlock(b=>({...b,tags:e.target.value.split(",").map(t=>t.trim())}))} style={{...IS,fontSize:11,padding:"5px 8px"}}/></div>
+                <div style={{display:"flex",gap:6}}><button onClick={()=>{setResumeBlocks(prev=>[...prev,{...newBlock,id:"b"+Date.now()}]);setNewBlock(null)}} style={{padding:"4px 14px",borderRadius:5,cursor:"pointer",fontSize:11,fontWeight:600,background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",color:"#6ee7b7"}}>✓ Save</button><button onClick={()=>setNewBlock(null)} style={{padding:"4px 10px",borderRadius:5,cursor:"pointer",fontSize:11,background:T.input,border:`1px solid ${T.border}`,color:T.muted}}>Cancel</button></div>
+              </div>}
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:580,overflowY:"auto"}}>
+                {resumeBlocks.map((b,i)=>{const sel=selectedBlocks.includes(i),editing=editingBlock===i;return(
+                  <div key={b.id} style={{padding:10,borderRadius:8,background:T.card,border:`2px solid ${sel?"#6366f1":T.border}`,cursor:"pointer",transition:"all .15s"}} onClick={()=>!editing&&setSelectedBlocks(prev=>sel?prev.filter(x=>x!==i):[...prev,i])}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:6}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:3}}>
+                          <span style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(99,102,241,.1)",color:"#a5b4fc",fontWeight:600}}>{b.cat}</span>
+                          {sel&&<span style={{fontSize:9,color:"#6366f1",fontWeight:700}}>✓ SELECTED</span>}
+                        </div>
+                        {editing?<input value={b.title} onChange={e=>setResumeBlocks(prev=>prev.map((x,j)=>j===i?{...x,title:e.target.value}:x))} style={{...IS,fontSize:12,fontWeight:600,padding:"3px 6px"}} onClick={e=>e.stopPropagation()}/>:<div style={{fontSize:12,fontWeight:600,color:darkMode?"#e0e7ff":T.fg}}>{b.title}</div>}
+                        {editing?<textarea value={b.content} onChange={e=>setResumeBlocks(prev=>prev.map((x,j)=>j===i?{...x,content:e.target.value}:x))} rows={3} style={{...IS,fontSize:11,marginTop:4,resize:"vertical",padding:"3px 6px"}} onClick={e=>e.stopPropagation()}/>:<div style={{fontSize:11,color:T.muted,margin:"3px 0",lineHeight:1.4}}>{b.content.slice(0,110)}...</div>}
+                        <div style={{fontSize:10,color:"#10b981",fontWeight:600,marginTop:2}}>📈 {b.impact}</div>
+                        <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:4}}>{b.tags.map(t=><span key={t} style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:"rgba(99,102,241,.06)",color:"#818cf8"}}>{t}</span>)}</div>
+                      </div>
+                      <div style={{display:"flex",gap:3,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                        <button onClick={()=>setEditingBlock(editing?null:i)} style={{padding:"2px 6px",borderRadius:3,cursor:"pointer",fontSize:9,background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.12)",color:"#fbbf24"}}>{editing?"✓":"✎"}</button>
+                        <button onClick={()=>setResumeBlocks(prev=>prev.filter((_,j)=>j!==i))} style={{padding:"2px 6px",borderRadius:3,cursor:"pointer",fontSize:9,background:"rgba(239,68,68,.04)",border:"1px solid rgba(239,68,68,.08)",color:"#f87171"}}>✕</button>
+                      </div>
+                    </div>
+                  </div>
+                );})}
+              </div>
+            </div>
+            <div>
+              <div style={{padding:14,borderRadius:10,background:T.card,border:`1px solid ${T.border}`,marginBottom:12}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 10px"}}>🤖 AI Block Selector</h3>
+                <div style={{fontSize:11,color:T.muted,marginBottom:4}}>Target Job / Role Description</div>
+                <input value={rvJob} onChange={e=>setRvJob(e.target.value)} placeholder="e.g. Senior DevOps at Stripe using AWS, K8s, Terraform" style={{...IS,marginBottom:8}}/>
+                <button onClick={runResumeVersion} disabled={rvLoad||!rvJob.trim()} style={{width:"100%",padding:"10px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,background:"linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.12))",border:"1px solid rgba(99,102,241,.2)",color:"#c7d2fe",marginBottom:8}}>{rvLoad?"🤖 Analyzing all blocks...":"🤖 AI: Pick Best 5 Blocks for This Role"}</button>
+                {rvLoad&&<div style={{display:"flex",alignItems:"center",gap:8,padding:8}}><div className="spin"/><span style={{fontSize:12,color:T.muted}}>Analyzing {resumeBlocks.length} blocks...</span></div>}
+                {rvOut&&!rvLoad&&<pre className="ao" style={{fontSize:11,maxHeight:350,overflow:"auto",marginTop:8}}>{rvOut}</pre>}
+              </div>
+              <div style={{padding:14,borderRadius:10,background:T.card,border:"1px solid rgba(16,185,129,.2)"}}>
+                <h3 style={{fontSize:14,fontWeight:700,color:"#6ee7b7",margin:"0 0 8px"}}>📄 Generate PDF Resume</h3>
+                <p style={{fontSize:11,color:T.muted,marginBottom:8}}>Select blocks from the left (click to toggle ✓). PDF opens in browser — Save as PDF.</p>
+                <div style={{fontSize:12,marginBottom:10,color:T.muted}}><b style={{color:darkMode?"#e0e7ff":T.fg}}>{selectedBlocks.length}</b> blocks selected</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>{resumeBlocks.filter((_,i)=>selectedBlocks.includes(i)).map(b=><span key={b.id} style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:"rgba(99,102,241,.08)",color:"#a5b4fc"}}>{b.cat}</span>)}</div>
+                <button onClick={generatePDF} disabled={selectedBlocks.length===0} style={{width:"100%",padding:"10px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,background:selectedBlocks.length>0?"linear-gradient(135deg,rgba(16,185,129,.12),rgba(5,150,105,.12))":"rgba(255,255,255,.02)",border:`1px solid ${selectedBlocks.length>0?"rgba(16,185,129,.25)":"rgba(255,255,255,.04)"}`,color:selectedBlocks.length>0?"#6ee7b7":"#374151"}}>
+                  🖨️ Print / Save as PDF ({selectedBlocks.length} blocks)
+                </button>
+                <p style={{fontSize:10,color:T.muted,marginTop:6,textAlign:"center"}}>Opens print dialog → choose "Save as PDF"</p>
+              </div>
+            </div>
+          </div>
+        </div>}
+
         {/* ═══ ROADMAP ════════════════════════════════════════════ */}
         {tab==="roadmap"&&<div style={{animation:"fu .2s"}}>
           <h2 style={{fontSize:18,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 4px"}}>🗺️ Advanced Systems Roadmap</h2>
@@ -1012,7 +1245,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
       </div>
 
       <footer style={{textAlign:"center",padding:"14px 0 6px",borderTop:`1px solid ${T.border}`,color:T.muted,fontSize:11,marginTop:20}}>
-        {profile.name} · FindMyJobs.store · Job Hunt Command Center v10 · {new Date().getFullYear()}
+        {profile.name} · FindMyJobs.store · Job Hunt Command Center v11 · {new Date().getFullYear()}
       </footer>
     </div>
   );
