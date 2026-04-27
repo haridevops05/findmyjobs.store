@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 /* ═══════════════════════════════════════════════════════════════════
-   FINDMYJOBS.STORE — COMMAND CENTER v11
+   FINDMYJOBS.STORE — COMMAND CENTER v12
    NEW: 📄 Resume Score Tab | 🎙️ Natural Voice-to-Voice Interview
    KEPT: All v9 features — 29 Portals, 9 AI Tools, Live Feed,
    Negotiation AI, Analytics, Quick Apply, Profile, Roadmap
@@ -108,27 +108,58 @@ const AI_LABELS={score:"Match Analysis",cover:"Cover Letter",interview:"Intervie
 // ── Utilities ─────────────────────────────────────────────────────────
 function safeBeep(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;const c=new A();(c.state==="suspended"?c.resume():Promise.resolve()).then(()=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;o.type="sine";g.gain.setValueAtTime(.1,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.3);o.start();o.stop(c.currentTime+.3);o.onended=()=>c.close()}).catch(()=>{})}catch{}}
 
-async function callAI(prompt,maxTokens=1200){
-  const k=localStorage.getItem("fmj_api_key");
-  if(!k)return"⚠️ Gemini API Key not set.\n\nGo to ⚙️ Settings tab → enter your Gemini API key.\nGet a FREE key at: https://aistudio.google.com/app/apikey\n(No credit card required!)";
-  // Try models in order — fallback if rate limited
+// ── AI ENGINE — Ollama (local) with Gemini cloud fallback ────────────
+async function callOllama(prompt,model,maxTokens){
+  // Ollama runs locally at port 11434 — unlimited, free, private
+  const r=await fetch("http://localhost:11434/api/generate",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model,prompt,stream:false,options:{num_predict:maxTokens,temperature:0.7}})
+  });
+  if(!r.ok)throw new Error(`Ollama HTTP ${r.status}`);
+  const d=await r.json();
+  return d.response||"No response";
+}
+
+async function callGemini(prompt,apiKey,maxTokens){
   const MODELS=["gemini-1.5-flash-latest","gemini-1.5-flash","gemini-1.0-pro"];
   for(const model of MODELS){
     try{
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${k}`,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          contents:[{parts:[{text:prompt}]}],
-          generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}
-        })
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:maxTokens,temperature:0.7}})
       });
-      if(!r.ok){const e=await r.json();const msg=e.error?.message||"";if(msg.includes("quota")||msg.includes("rate")||msg.includes("limit")){console.warn(`${model} rate limited, trying next...`);continue;}throw new Error(msg||`HTTP ${r.status}`)}
+      if(!r.ok){const e=await r.json();const msg=e.error?.message||"";if(msg.includes("quota")||msg.includes("rate")||msg.includes("limit")){continue;}throw new Error(msg||`HTTP ${r.status}`)}
       const d=await r.json();
       return d.candidates?.[0]?.content?.parts?.[0]?.text||"No response";
-    }catch(e){if(e.message.includes("quota")||e.message.includes("rate")||e.message.includes("limit")){continue;}return`AI Error: ${e.message}`}
+    }catch(e){if(e.message?.includes("quota")||e.message?.includes("rate")||e.message?.includes("limit")){continue;}throw e;}
   }
-  return"⚠️ All Gemini models are rate limited right now.\nFree tier: 15 requests/minute.\nPlease wait 1 minute and try again.";
+  throw new Error("All Gemini models rate limited. Wait 1 min or switch to Ollama.");
+}
+
+async function callAI(prompt,maxTokens=1200){
+  const mode=localStorage.getItem("fmj_ai_mode")||"gemini"; // "ollama" | "gemini" | "auto"
+  const ollamaModel=localStorage.getItem("fmj_ollama_model")||"llama3";
+  const geminiKey=localStorage.getItem("fmj_api_key")||"";
+
+  // AUTO mode: try Ollama first, fall back to Gemini
+  if(mode==="auto"){
+    try{return await callOllama(prompt,ollamaModel,maxTokens);}
+    catch{
+      if(!geminiKey)return"⚠️ Ollama not running + no Gemini key set.\nEither start Ollama or add a Gemini key in Settings.";
+      try{return await callGemini(prompt,geminiKey,maxTokens);}
+      catch(e){return`AI Error: ${e.message}`}
+    }
+  }
+  // OLLAMA only
+  if(mode==="ollama"){
+    try{return await callOllama(prompt,ollamaModel,maxTokens);}
+    catch(e){return`⚠️ Ollama Error: ${e.message}\n\nMake sure Ollama is running:\n  1. Install from ollama.com\n  2. Run: ollama serve\n  3. Pull model: ollama pull ${ollamaModel}`}
+  }
+  // GEMINI only (default)
+  if(!geminiKey)return"⚠️ No Gemini API Key.\n\nGo to ⚙️ Settings → add your free key from aistudio.google.com\nOR switch to Ollama mode for unlimited local AI.";
+  try{return await callGemini(prompt,geminiKey,maxTokens);}
+  catch(e){return`AI Error: ${e.message}`}
 }
 
 function ago(d){if(!d)return"—";const m=Math.floor((Date.now()-new Date(d).getTime())/6e4);if(m<1)return"now";if(m<60)return m+"m";const h=Math.floor(m/60);return h<24?h+"h":Math.floor(h/24)+"d";}
@@ -646,7 +677,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#6366f1,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>⚡</div>
             <div>
-              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v11</span></h1>
+              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v12</span></h1>
               <p style={{fontSize:11,color:T.muted,margin:0}}>{profile.name} · {profile.avail}</p>
             </div>
           </div>
@@ -1101,6 +1132,65 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
         {/* ═══ SETTINGS ═══════════════════════════════════════════ */}
         {tab==="settings"&&<div style={{animation:"fu .2s",maxWidth:700,margin:"0 auto"}}>
           <h2 style={{fontSize:18,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 20px"}}>⚙️ Settings</h2>
+
+          {/* ── AI ENGINE SELECTOR ── */}
+          <div style={{padding:20,borderRadius:12,background:T.card,border:"2px solid #6366f1",marginBottom:20}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <h3 style={{fontSize:15,margin:0,color:"#a5b4fc"}}>🤖 AI Engine</h3>
+              <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(99,102,241,.15)",color:"#6366f1",fontWeight:700}}>Choose Your Power Source</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+              {[
+                {v:"gemini",label:"☁️ Gemini",sub:"Cloud API",desc:"Free key, no setup. 15 req/min limit.",c:"#10b981"},
+                {v:"ollama",label:"🖥️ Ollama",sub:"Local LLM",desc:"Unlimited. Runs on your machine. Private.",c:"#6366f1"},
+                {v:"auto",label:"⚡ Auto",sub:"Smart Fallback",desc:"Try Ollama first, fallback to Gemini.",c:"#f59e0b"},
+              ].map(opt=>{
+                const active=(localStorage.getItem("fmj_ai_mode")||"gemini")===opt.v;
+                return(
+                  <button key={opt.v} onClick={()=>{localStorage.setItem("fmj_ai_mode",opt.v);setApiSaved(true);setTimeout(()=>setApiSaved(false),1500)}}
+                    style={{padding:12,borderRadius:8,cursor:"pointer",border:`2px solid ${active?opt.c:"rgba(255,255,255,.06)"}`,background:active?`${opt.c}12`:"transparent",textAlign:"left",transition:"all .2s"}}>
+                    <div style={{fontSize:16,marginBottom:3}}>{opt.label}</div>
+                    <div style={{fontSize:10,fontWeight:700,color:opt.c,marginBottom:2}}>{opt.sub}</div>
+                    <div style={{fontSize:10,color:T.muted,lineHeight:1.4}}>{opt.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Ollama Setup Section */}
+            <div style={{padding:14,borderRadius:8,background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.12)",marginBottom:14}}>
+              <p style={{fontSize:13,fontWeight:700,color:"#a5b4fc",margin:"0 0 10px"}}>🖥️ Ollama — Local Setup (One-Time, Free Forever)</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                {[{i:"🚀",l:"Unlimited requests"},{i:"🔒",l:"100% private"},{i:"💰",l:"Zero API costs"},{i:"⚡",l:"No rate limits ever"}].map(x=>(
+                  <div key={x.l} style={{padding:"6px 10px",borderRadius:5,background:"rgba(99,102,241,.06)",fontSize:11,color:"#a5b4fc"}}>{x.i} {x.l}</div>
+                ))}
+              </div>
+              <div style={{fontSize:12,color:T.muted,lineHeight:2.2,marginBottom:10}}>
+                <div>1️⃣ Download from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" style={{color:"#6366f1",fontWeight:600}}>ollama.com</a> and install</div>
+                <div>2️⃣ Open terminal and run: <code style={{fontSize:11,color:"#a5b4fc",background:"rgba(99,102,241,.08)",padding:"1px 7px",borderRadius:3}}>ollama serve</code></div>
+                <div>3️⃣ Pull a model: <code style={{fontSize:11,color:"#a5b4fc",background:"rgba(99,102,241,.08)",padding:"1px 7px",borderRadius:3}}>ollama pull llama3</code> (4GB) or <code style={{fontSize:11,color:"#a5b4fc",background:"rgba(99,102,241,.08)",padding:"1px 7px",borderRadius:3}}>ollama pull mistral</code></div>
+                <div>4️⃣ Select model below and set AI Engine to <b style={{color:"#6366f1"}}>Ollama</b> or <b style={{color:"#f59e0b"}}>Auto</b></div>
+              </div>
+              <div style={{marginBottom:8}}>
+                <div style={{fontSize:11,color:T.muted,marginBottom:4}}>Active Ollama Model</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                  {["llama3","llama3:8b","mistral","mistral:7b","gemma2","phi3","codellama","qwen2","deepseek-r1"].map(m=>{
+                    const active=(localStorage.getItem("fmj_ollama_model")||"llama3")===m;
+                    return(
+                      <button key={m} onClick={()=>{localStorage.setItem("fmj_ollama_model",m);setApiSaved(true);setTimeout(()=>setApiSaved(false),1500)}}
+                        style={{padding:"4px 10px",borderRadius:5,cursor:"pointer",fontSize:11,fontWeight:active?700:400,
+                          background:active?"rgba(99,102,241,.15)":"transparent",border:`1px solid ${active?"rgba(99,102,241,.4)":"rgba(255,255,255,.06)"}`,color:active?"#a5b4fc":T.muted}}>
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{padding:"8px 12px",borderRadius:6,background:"rgba(99,102,241,.06)",fontSize:11,color:"#a5b4fc",fontFamily:"'JetBrains Mono',monospace"}}>
+                API Endpoint: <span style={{color:"#6ee7b7"}}>http://localhost:11434/api/generate</span>
+              </div>
+            </div>
+          </div>
           <div style={{padding:20,borderRadius:12,background:T.card,border:`2px solid #10b981`,marginBottom:20}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
               <h3 style={{fontSize:15,margin:0,color:"#6ee7b7"}}>🔑 Gemini API Key</h3>
@@ -1245,7 +1335,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
       </div>
 
       <footer style={{textAlign:"center",padding:"14px 0 6px",borderTop:`1px solid ${T.border}`,color:T.muted,fontSize:11,marginTop:20}}>
-        {profile.name} · FindMyJobs.store · Job Hunt Command Center v11 · {new Date().getFullYear()}
+        {profile.name} · FindMyJobs.store · Job Hunt Command Center v12 · {new Date().getFullYear()}
       </footer>
     </div>
   );
