@@ -346,37 +346,8 @@ Be specific. Use your knowledge of ${job.co}. If you don't know specifics, say s
   // ── RESUME VERSIONING ───────────────────────────────────────────────
   const runResumeVersion=async()=>{
     if(!rvJob.trim())return;setRvLoad(true);setRvOut("");
-    const blockList=resumeBlocks.map((b,i)=>`[${i+1}] ${b.cat}: ${b.title}
-Tags: ${b.tags.join(", ")}
-Impact: ${b.impact}`).join("
-
-");
-    const r=await callAI(`You are an elite resume strategist and ATS expert specializing in DevOps/Cloud roles.
-
-TARGET JOB: ${rvJob}
-
-CANDIDATE: ${profStr()}
-
-AVAILABLE EXPERIENCE BLOCKS (${resumeBlocks.length} total):
-${blockList}
-
-TASK:
-1. BLOCK SELECTION — Pick the 5 BEST blocks for this specific role. For each:
-   - Block number and title
-   - Why it matches (specific JD keywords it covers)
-   - How to lead with it
-
-2. TAILORED RESUME SUMMARY — Write a 3-sentence ATS-optimized summary specifically for "${rvJob}"
-
-3. SKILLS SECTION — List 15 most relevant skills for this role from candidate's stack, ranked by importance
-
-4. ATS KEYWORDS TO ADD — 10 keywords from the JD to weave into the selected blocks
-
-5. OPENING LINE — Write a powerful 1-line headline for this specific application
-
-6. BLOCK OPTIMIZATION — For each selected block, suggest ONE specific tweak to maximize relevance
-
-Format clearly with headers. Be specific, not generic.`,1800);
+    const blockList=resumeBlocks.map((b,i)=>`[${i+1}] ${b.cat}: ${b.title}\nTags: ${b.tags.join(", ")}\nImpact: ${b.impact}`).join("\n\n");
+    const r=await callAI("You are an elite resume strategist. Target job: "+rvJob+"\n\nCandidate: "+profStr()+"\n\nBlocks:\n"+blockList+"\n\nTASK:\n1.BLOCK SELECTION: Pick 5 BEST blocks, explain why each matches\n2.TAILORED SUMMARY: 3-sentence ATS summary for this role\n3.SKILLS: 15 most relevant ranked\n4.ATS KEYWORDS: 10 to weave in\n5.HEADLINE: 1 powerful line\n6.BLOCK TWEAKS: One tweak per selected block\n\nBe specific not generic.",1800);
     setRvOut(r);setRvLoad(false);
   };
 
