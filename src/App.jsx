@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import WorldMap from "./WorldMap";
 
 /* ═══════════════════════════════════════════════════════════════════
    FINDMYJOBS.STORE — COMMAND CENTER v12
@@ -604,6 +605,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
   const IS={padding:"9px 12px",borderRadius:8,background:T.input,border:`1px solid ${T.border}`,color:T.fg,fontSize:13,fontFamily:"inherit",width:"100%",backdropFilter:"blur(8px)",transition:"border-color .2s"};
 
   const TABS=[
+    {k:"worldmap", l:"🌍 World Map"},
     {k:"live",l:"📡 Live Jobs",b:filteredJobs.length,gw:fresh.size>0},
     {k:"portals",l:"📋 All Portals",b:PL.length},
     {k:"interview",l:"🎙️ Voice Interview"},
@@ -706,6 +708,9 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
             </button>
           ))}
         </div>
+        {tab==="worldmap"&&<div style={{animation:"fu .2s"}}>
+          <WorldMap darkMode={darkMode}/>
+        </div>}
 
         {/* ═══ LIVE JOBS ═══════════════════════════════════════════ */}
         {tab==="live"&&<div style={{animation:"fu .2s"}}>
