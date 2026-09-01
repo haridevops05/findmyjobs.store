@@ -1,5 +1,7 @@
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WorldMap from "./WorldMap";
+import ResumeMatch from './components/ResumeMatch';
 
 /* ═══════════════════════════════════════════════════════════════════
    FINDMYJOBS.STORE — COMMAND CENTER v12
@@ -8,6 +10,24 @@ import WorldMap from "./WorldMap";
    Negotiation AI, Analytics, Quick Apply, Profile, Roadmap
    ═══════════════════════════════════════════════════════════════════ */
 
+   function App() {
+  return (
+    <Router>
+      <nav style={{ padding: "15px", background: "#1a1a1a", color: "white" }}>
+        <Link to="/" style={{ color: "white", marginRight: "20px", textDecoration: "none" }}>Dashboard</Link>
+        <Link to="/map" style={{ color: "white", marginRight: "20px", textDecoration: "none" }}>Live Map</Link>
+        <Link to="/resume-match" style={{ color: "white", textDecoration: "none" }}>🎯 AI Resume Match</Link>
+      </nav>
+      <Routes>
+        <Route path="/" element={<div><h2>Job Alerts Dashboard</h2></div>} />
+        <Route path="/map" element={<WorldMap />} />
+        <Route path="/resume-match" element={<ResumeMatch />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
 const DP={
   name:"Hari Krishna S.",title:"Senior DevOps Engineer — AWS & Cloud Infrastructure",
   email:"s.harikrishna.1205@gmail.com",phone:"+91 9491370132",loc:"Hyderabad, India",

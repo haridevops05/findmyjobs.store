@@ -2,8 +2,8 @@ name: FindMyJobs Real-Time Alerts
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes (3x faster than 15 min)
-  workflow_dispatch:  # Manual trigger
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 jobs:
   scan-jobs:
@@ -12,17 +12,22 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-generativeai playwright
+          playwright install chromium
+      
       - name: Run job scanner
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
@@ -35,6 +40,12 @@ jobs:
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
-          git add seen_jobs.json
-          git commit -m "[skip ci] Update seen_jobs.json" || echo "No changes to commit"
+          if [ -f seen_jobs.json ]; then
+            git add seen_jobs.json
+            git commit -m "[skip ci] Update seen_jobs.json" || echo "No changes to commit"
+          else
+            echo "{}" > seen_jobs.json
+            git add seen_jobs.json
+            git commit -m "[skip ci] Initialize seen_jobs.json"
+          fi
           git push
