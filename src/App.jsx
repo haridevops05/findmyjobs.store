@@ -1,33 +1,14 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WorldMap from "./WorldMap";
 import ResumeMatch from './components/ResumeMatch';
 
 /* ═══════════════════════════════════════════════════════════════════
-   FINDMYJOBS.STORE — COMMAND CENTER v12
-   NEW: 📄 Resume Score Tab | 🎙️ Natural Voice-to-Voice Interview
-   KEPT: All v9 features — 29 Portals, 9 AI Tools, Live Feed,
+   FINDMYJOBS.STORE — COMMAND CENTER v13
+   NEW: 🎯 AI Resume Match & DeepSearch Integrated
+   KEPT: All v12 features — 29 Portals, 9 AI Tools, Live Feed,
    Negotiation AI, Analytics, Quick Apply, Profile, Roadmap
    ═══════════════════════════════════════════════════════════════════ */
 
-   function App() {
-  return (
-    <Router>
-      <nav style={{ padding: "15px", background: "#1a1a1a", color: "white" }}>
-        <Link to="/" style={{ color: "white", marginRight: "20px", textDecoration: "none" }}>Dashboard</Link>
-        <Link to="/map" style={{ color: "white", marginRight: "20px", textDecoration: "none" }}>Live Map</Link>
-        <Link to="/resume-match" style={{ color: "white", textDecoration: "none" }}>🎯 AI Resume Match</Link>
-      </nav>
-      <Routes>
-        <Route path="/" element={<div><h2>Job Alerts Dashboard</h2></div>} />
-        <Route path="/map" element={<WorldMap />} />
-        <Route path="/resume-match" element={<ResumeMatch />} />
-      </Routes>
-    </Router>
-  );
-}
-
-export default App;
 const DP={
   name:"Hari Krishna S.",title:"Senior DevOps Engineer — AWS & Cloud Infrastructure",
   email:"s.harikrishna.1205@gmail.com",phone:"+91 9491370132",loc:"Hyderabad, India",
@@ -131,7 +112,6 @@ function safeBeep(){try{const A=window.AudioContext||window.webkitAudioContext;i
 
 // ── AI ENGINE — Ollama (local) with Gemini cloud fallback ────────────
 async function callOllama(prompt,model,maxTokens){
-  // Ollama runs locally at port 11434 — unlimited, free, private
   const r=await fetch("http://localhost:11434/api/generate",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -159,11 +139,10 @@ async function callGemini(prompt,apiKey,maxTokens){
 }
 
 async function callAI(prompt,maxTokens=1200){
-  const mode=localStorage.getItem("fmj_ai_mode")||"gemini"; // "ollama" | "gemini" | "auto"
+  const mode=localStorage.getItem("fmj_ai_mode")||"gemini";
   const ollamaModel=localStorage.getItem("fmj_ollama_model")||"llama3";
   const geminiKey=localStorage.getItem("fmj_api_key")||"";
 
-  // AUTO mode: try Ollama first, fall back to Gemini
   if(mode==="auto"){
     try{return await callOllama(prompt,ollamaModel,maxTokens);}
     catch{
@@ -172,12 +151,10 @@ async function callAI(prompt,maxTokens=1200){
       catch(e){return`AI Error: ${e.message}`}
     }
   }
-  // OLLAMA only
   if(mode==="ollama"){
     try{return await callOllama(prompt,ollamaModel,maxTokens);}
     catch(e){return`⚠️ Ollama Error: ${e.message}\n\nMake sure Ollama is running:\n  1. Install from ollama.com\n  2. Run: ollama serve\n  3. Pull model: ollama pull ${ollamaModel}`}
   }
-  // GEMINI only (default)
   if(!geminiKey)return"⚠️ No Gemini API Key.\n\nGo to ⚙️ Settings → add your free key from aistudio.google.com\nOR switch to Ollama mode for unlimited local AI.";
   try{return await callGemini(prompt,geminiKey,maxTokens);}
   catch(e){return`AI Error: ${e.message}`}
@@ -243,10 +220,10 @@ export default function App(){
 
   // ── RESUME SCORE STATE ─────────────────────────────────────────────
   const[resumeFile,setResumeFile]=useState(null);
-  const[resumeText,setResumeText]=useState(""); // pasted text fallback
-  const[resumeScore,setResumeScore]=useState(null); // full AI response
+  const[resumeText,setResumeText]=useState(""); 
+  const[resumeScore,setResumeScore]=useState(null); 
   const[resumeLoading,setResumeLoading]=useState(false);
-  const[resumeTarget,setResumeTarget]=useState("Senior DevOps Engineer"); // target role
+  const[resumeTarget,setResumeTarget]=useState("Senior DevOps Engineer"); 
   const resumeFileRef=useRef(null);
 
   // ── DEEP RESEARCH STATE ───────────────────────────────────────────
@@ -271,7 +248,6 @@ export default function App(){
   const[rvJob,setRvJob]=useState("");
   const[rvOut,setRvOut]=useState("");
   const[rvLoad,setRvLoad]=useState(false);
-  const[rvPdf,setRvPdf]=useState(false);
   const[editingBlock,setEditingBlock]=useState(null);
   const[newBlock,setNewBlock]=useState(null);
 
@@ -279,14 +255,13 @@ export default function App(){
   const[ivActive,setIvActive]=useState(false);
   const[ivRole,setIvRole]=useState("Senior DevOps Engineer");
   const[ivCompany,setIvCompany]=useState("");
-  const[ivMessages,setIvMessages]=useState([]); // [{role:"ai"|"user", text, ts}]
-  const[ivLoading,setIvLoading]=useState(false);  // Claude is thinking
-  const[ivListening,setIvListening]=useState(false); // mic is on
-  const[ivSpeaking,setIvSpeaking]=useState(false);   // TTS playing
+  const[ivMessages,setIvMessages]=useState([]);
+  const[ivLoading,setIvLoading]=useState(false); 
+  const[ivListening,setIvListening]=useState(false);
+  const[ivSpeaking,setIvSpeaking]=useState(false);  
   const[ivVoiceOn,setIvVoiceOn]=useState(true);
-  const[ivTranscript,setIvTranscript]=useState(""); // live speech-to-text
+  const[ivTranscript,setIvTranscript]=useState(""); 
   const[ivEnded,setIvEnded]=useState(false);
-  const[ivSessionScore,setIvSessionScore]=useState(null);
 
   const synthRef=useRef(window.speechSynthesis);
   const recRef=useRef(null);
@@ -305,7 +280,7 @@ export default function App(){
   useEffect(()=>{
     const h=(e)=>{
       if(e.ctrlKey||e.metaKey){
-        const map={"1":"live","2":"portals","3":"interview","4":"resume_score","5":"alerts","6":"nego","7":"funnel","8":"apply","9":"profile","0":"settings"};
+        const map={"1":"live","2":"portals","3":"interview","4":"resume_match","5":"alerts","6":"nego","7":"funnel","8":"apply","9":"profile","0":"settings"};
         if(map[e.key]){e.preventDefault();setTab(map[e.key]);}
       }
     };
@@ -323,7 +298,6 @@ export default function App(){
   const runDeepResearch=async(job)=>{
     setResearchJob(job.id);setResearchLoad(job.id);
     const cached=researchOut[job.id];if(cached){setResearchLoad(null);return;}
-    // Step 1: Use Gemini to research the company via its knowledge
     const r=await callAI(`You are an elite tech researcher. Deeply research this company and role for a candidate preparing to apply and interview.
 
 COMPANY: ${job.co}
@@ -450,10 +424,6 @@ Be specific. Use your knowledge of ${job.co}. If you don't know specifics, say s
   },[]);
 
   // ── INTERVIEW ENGINE ───────────────────────────────────────────────
-  // The key: Claude acts as a REAL interviewer.
-  // No fixed question count. It reads the conversation history and decides
-  // naturally when to probe deeper, change topic, wrap up.
-  // Every question is grounded in the candidate's actual resume.
   const INTERVIEWER_SYSTEM=()=>`You are a senior technical interviewer at a top tech company.
 You are interviewing ${profile.name} for: ${ivRole}${ivCompany?` at ${ivCompany}`:""}
 
@@ -465,8 +435,6 @@ INTERVIEW RULES:
 - Ask ONE question at a time. Never list multiple questions.
 - Base questions on the candidate's ACTUAL resume — reference specific things they've done
   e.g. "You mentioned reducing CI from 45min to 8min — walk me through how you achieved that"
-  e.g. "Your EKS setup handled 20+ microservices at 99.9% — what was your HA strategy?"
-  e.g. "You worked with Falco + Kyverno — describe a real security incident you caught in production"
 - Mix question types naturally: technical depth → real scenarios → behavioral → situational
 - After each answer: give brief natural feedback (1-2 sentences) then ask your next question
 - If an answer is vague: dig deeper with "Can you be more specific?" or "Give me a concrete example"
@@ -477,7 +445,7 @@ INTERVIEW RULES:
 
   const startInterview=async()=>{
     if(!ivRole.trim())return;
-    setIvActive(true);setIvMessages([]);setIvEnded(false);setIvSessionScore(null);setIvLoading(true);
+    setIvActive(true);setIvMessages([]);setIvEnded(false);setIvLoading(true);
     const opening=await callAI(`${INTERVIEWER_SYSTEM()}\n\nThis is the START of the interview. Greet the candidate warmly (1-2 sentences), introduce yourself briefly, then ask your FIRST question — make it specific to something in their resume. Keep it under 80 words total.`,300);
     const msg={role:"ai",text:opening,ts:Date.now()};
     setIvMessages([msg]);
@@ -506,8 +474,6 @@ CANDIDATE JUST SAID: "${answer}"
 ${questionCount>=8?"You've asked ${questionCount} questions. Consider whether the interview has covered enough ground. If yes, wrap it up naturally with honest feedback and a score out of 10 for each: Technical Depth, Communication, Real-World Experience. If there's still a key area uncovered, ask one more question.":"Respond naturally as the interviewer. Give brief feedback on their answer (1-2 sentences), then ask your next question grounded in their resume. ONE question only. Under 120 words total."}`;
 
     const response=await callAI(prompt,400);
-
-    // Detect if Claude is wrapping up
     const isEnding=/(overall|final|wrap|conclude|session|score|10|that.{0,20}covers|good luck|best of luck|thank you for)/i.test(response)&&questionCount>=6;
 
     const aiMsg={role:"ai",text:response,ts:Date.now()};
@@ -630,6 +596,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
     {k:"portals",l:"📋 All Portals",b:PL.length},
     {k:"interview",l:"🎙️ Voice Interview"},
     {k:"resume_score",l:"📄 Resume Score"},
+    {k:"resume_match",l:"🎯 AI Resume Match"},
     {k:"alerts",l:"🔔 Alerts"},
     {k:"nego",l:"🤝 Negotiate"},
     {k:"funnel",l:"📊 Analytics"},
@@ -695,7 +662,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#6366f1,#10b981)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>⚡</div>
             <div>
-              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v12</span></h1>
+              <h1 style={{fontWeight:700,fontSize:18,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Job Hunt Command Center <span style={{fontSize:10,color:T.muted,fontWeight:400}}>v13</span></h1>
               <p style={{fontSize:11,color:T.muted,margin:0}}>{profile.name} · {profile.avail}</p>
             </div>
           </div>
@@ -1017,7 +984,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
               <div>
                 <h3 style={{fontSize:15,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:0}}>Resume Analysis — {resumeTarget}</h3>
-                <p style={{fontSize:11,color:T.muted,margin:"4px 0 0"}}>Analyzed against 2025 market standards for {resumeTarget} roles</p>
+                <p style={{fontSize:11,color:T.muted,margin:"4px 0 0"}}>Analyzed against 2026 market standards for {resumeTarget} roles</p>
               </div>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>cp(resumeScore,"res")} style={{padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:11,background:cpd==="res"?"rgba(16,185,129,.1)":T.input,border:`1px solid ${T.border}`,color:cpd==="res"?"#10b981":T.muted}}>{cpd==="res"?"✓ Copied":"📋 Copy"}</button>
@@ -1029,13 +996,18 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
 
           {/* Tips */}
           {!resumeScore&&!resumeLoading&&<div style={{padding:16,borderRadius:10,background:"rgba(99,102,241,.04)",border:"1px solid rgba(99,102,241,.1)"}}>
-            <h3 style={{fontSize:13,color:"#a5b4fc",margin:"0 0 10px"}}>What Claude will analyze:</h3>
+            <h3 style={{fontSize:13,color:"#a5b4fc",margin:"0 0 10px"}}>What the AI will analyze:</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12,color:T.muted}}>
               {["📊 Overall score with 4-dimension breakdown","✅ Specific strengths (quoting your resume)","🔴 Critical gaps that cause ATS rejection","💡 5 improvements with before/after rewrites","🔍 15 missing ATS keywords by importance","📝 Rewritten professional summary for your role","📈 Salary impact of current vs. optimized resume","⚡ #1 thing to fix in the next 30 minutes"].map(t=>(
                 <div key={t} style={{padding:"8px 12px",borderRadius:6,background:T.card,border:`1px solid ${T.border}`}}>{t}</div>
               ))}
             </div>
           </div>}
+        </div>}
+
+        {/* ═══ AI RESUME MATCH (NEW TAB) ══════════════════════════════════════ */}
+        {tab==="resume_match"&&<div style={{animation:"fu .2s"}}>
+          <ResumeMatch />
         </div>}
 
         {/* ═══ ALERT SETUP ════════════════════════════════════════ */}
@@ -1249,7 +1221,7 @@ For each: [SECTION] → Before: "exact current text" → After: "exact improved 
           </div>
         </div>}
 
-                {tab==="research"&&<div style={{animation:"fu .2s"}}>
+        {tab==="research"&&<div style={{animation:"fu .2s"}}>
           <h2 style={{fontSize:18,fontWeight:700,color:darkMode?"#e0e7ff":T.fg,margin:"0 0 4px"}}>🔬 Deep Research Agent</h2>
           <p style={{fontSize:13,color:T.muted,marginBottom:20}}>Click "🔬 Deep Research" on any job card in the Live Jobs tab to get company intel, tech stack, interview power moves, and personalized talking points. Results cached so they reload instantly.</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:12}}>
