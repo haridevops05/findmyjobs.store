@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from "react";
    No fake maps. Just what works.
    ═══════════════════════════════════════════════════════════════════ */
 
-const MAX_AGE_MS = 7 * 86400000;
+const MAX_AGE_MS = 30 * 86400000; // show up to 30 days
 const CACHE_KEY  = "wm10_cache";
 const CACHE_TS   = "wm10_ts";
 const CACHE_TTL  = 15 * 60 * 1000;

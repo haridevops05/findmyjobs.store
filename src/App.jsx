@@ -47,7 +47,7 @@ const FEEDS = [
   { id:"arbeitnow", name:"Arbeitnow", url:"https://www.arbeitnow.com/api/job-board-api?search=devops+aws+kubernetes", p:"abn" },
 ];
 // ── Date fix: RemoteOK j.date is Unix SECONDS not ms ─────────────
-const MAX_JOB_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_JOB_AGE_MS = 30 * 24 * 60 * 60 * 1000; // fetch up to 30 days, display warns if older than 7
 function safeDate(val) {
   if (!val) return null;
   const ms = typeof val === "number" ? (val < 1e12 ? val * 1000 : val) : new Date(val).getTime();
@@ -193,7 +193,7 @@ async function callAI(prompt, maxTokens=1200, grounded=false) {
   }
 }
 
-function ago(d){if(!d)return"—";const ms=new Date(d).getTime();if(isNaN(ms))return"—";const m=Math.floor((Date.now()-ms)/6e4);if(m<2)return"Just now";if(m<60)return m+"m ago";const h=Math.floor(m/60);if(h<24)return h+"h ago";if(h<48)return"Yesterday";const days=Math.floor(h/24);return days+"d ago";}
+function ago(d){if(!d)return"—";const ms=new Date(d).getTime();if(isNaN(ms))return"—";const m=Math.floor((Date.now()-ms)/6e4);if(m<2)return"Just now";if(m<60)return m+"m ago";const h=Math.floor(m/60);if(h<24)return h+"h ago";if(h<48)return"Yesterday";const days=Math.floor(h/24);if(days<=7)return days+"d ago";return days+"d ago ⚠️";}
 function tstr(d){try{return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric"})}catch{return""}}
 function useDebounce(v,d){const[dv,setDv]=useState(v);useEffect(()=>{const h=setTimeout(()=>setDv(v),d);return()=>clearTimeout(h)},[v,d]);return dv;}
 
