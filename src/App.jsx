@@ -46,11 +46,35 @@ const FEEDS = [
   { id:"remotive",  name:"Remotive",  url:"https://remotive.com/api/remote-jobs?category=devops-sysadmin", p:"rem" },
   { id:"arbeitnow", name:"Arbeitnow", url:"https://www.arbeitnow.com/api/job-board-api?search=devops+aws+kubernetes", p:"abn" },
 ];
+// ── Date fix: RemoteOK j.date is Unix SECONDS not ms ─────────────
+const MAX_JOB_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+function safeDate(val) {
+  if (!val) return null;
+  const ms = typeof val === "number" ? (val < 1e12 ? val * 1000 : val) : new Date(val).getTime();
+  return isNaN(ms) ? null : ms;
+}
+function jobFresh(ms) { return ms && (Date.now() - ms) <= MAX_JOB_AGE_MS; }
 function parseJ(p, d) {
-  if (p==="rok") return (Array.isArray(d)?d:[]).filter(j=>j.position&&isDevOps(j.position,j.tags,"")).slice(0,20).map(j=>({id:"r"+j.id,t:j.position,co:j.company||"?",url:j.url||"https://remoteok.com",dt:j.date||new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:j.salary_min?`$${(j.salary_min/1e3).toFixed(0)}k–$${(j.salary_max/1e3).toFixed(0)}k`:null,loc:j.location||"Remote",src:"RemoteOK",desc:j.description||""}));
-  if (p==="rem") return (d?.jobs||[]).filter(j=>isDevOps(j.title,[j.category],j.description)).slice(0,20).map(j=>({id:"m"+j.id,t:j.title,co:j.company_name,url:j.url,dt:j.publication_date,tags:[j.category,...(j.tags||[])].filter(Boolean).slice(0,5),sal:j.salary||null,loc:j.candidate_required_location||"Remote",src:"Remotive",desc:j.description||""}));
-  if (p==="abn") return (d?.data||[]).filter(j=>isDevOps(j.title,j.tags,"")).slice(0,20).map(j=>({id:"a"+j.slug,t:j.title,co:j.company_name,url:j.url,dt:j.created_at?new Date(j.created_at*1e3).toISOString():new Date().toISOString(),tags:(j.tags||[]).slice(0,5),sal:null,loc:j.location||"Remote",src:"Arbeitnow",desc:j.description||""}));
-  return [];
+  if (p==="rok") return (Array.isArray(d)?d:[])
+    .filter(j=>j.position&&isDevOps(j.position,j.tags,""))
+    .map(j=>{ const ms=safeDate(j.date); if(!jobFresh(ms)) return null;
+      return {id:"r"+j.id,t:j.position,co:j.company||"?",url:j.url||"https://remoteok.com",
+        dt:new Date(ms).toISOString(),tags:(j.tags||[]).slice(0,5),
+        sal:j.salary_min?`$${(j.salary_min/1e3).toFixed(0)}k–$${(j.salary_max/1e3).toFixed(0)}k`:null,
+        loc:j.location||"Remote",src:"RemoteOK",desc:j.description||""}; }).filter(Boolean);
+  if (p==="rem") return (d?.jobs||[])
+    .filter(j=>isDevOps(j.title,[j.category],j.description))
+    .map(j=>{ const ms=safeDate(j.publication_date); if(!jobFresh(ms)) return null;
+      return {id:"m"+j.id,t:j.title,co:j.company_name,url:j.url,
+        dt:new Date(ms).toISOString(),tags:[j.category,...(j.tags||[])].filter(Boolean).slice(0,5),
+        sal:j.salary||null,loc:j.candidate_required_location||"Remote",src:"Remotive",desc:j.description||""}; }).filter(Boolean);
+  if (p==="abn") return (d?.data||[])
+    .filter(j=>isDevOps(j.title,j.tags,""))
+    .map(j=>{ const ms=safeDate(j.created_at); if(!jobFresh(ms)) return null;
+      return {id:"a"+j.slug,t:j.title,co:j.company_name,url:j.url,
+        dt:new Date(ms).toISOString(),tags:(j.tags||[]).slice(0,5),
+        sal:null,loc:j.location||"Remote",src:"Arbeitnow",desc:j.description||""}; }).filter(Boolean);
+  return[];
 }
 const DEMO = [
   {id:"d1",t:"Senior DevOps Engineer",co:"TechCorp Global",url:"https://remoteok.com/remote-devops-jobs",dt:new Date().toISOString(),tags:["kubernetes","aws","terraform","eks"],sal:"$150k–$200k",loc:"Remote (US)",src:"RemoteOK",desc:"Senior DevOps engineer: Kubernetes EKS, AWS, Terraform, CI/CD."},
@@ -169,7 +193,7 @@ async function callAI(prompt, maxTokens=1200, grounded=false) {
   }
 }
 
-function ago(d){if(!d)return"—";const m=Math.floor((Date.now()-new Date(d).getTime())/6e4);if(m<1)return"now";if(m<60)return m+"m";const h=Math.floor(m/60);return h<24?h+"h":Math.floor(h/24)+"d";}
+function ago(d){if(!d)return"—";const ms=new Date(d).getTime();if(isNaN(ms))return"—";const m=Math.floor((Date.now()-ms)/6e4);if(m<2)return"Just now";if(m<60)return m+"m ago";const h=Math.floor(m/60);if(h<24)return h+"h ago";if(h<48)return"Yesterday";const days=Math.floor(h/24);return days+"d ago";}
 function tstr(d){try{return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric"})}catch{return""}}
 function useDebounce(v,d){const[dv,setDv]=useState(v);useEffect(()=>{const h=setTimeout(()=>setDv(v),d);return()=>clearTimeout(h)},[v,d]);return dv;}
 
@@ -429,7 +453,28 @@ Search for current 2026 information. State clearly if you cannot find specific i
 
   const fetchAll=useCallback(async()=>{
     setLoading(true);setFErr([]);setDemo(false);let res=[];const errs=[];
-    for(const f of FEEDS){try{const r=await fetch(CORS+encodeURIComponent(f.url));if(!r.ok)throw new Error(`${r.status}`);const d=await r.json();res.push(...parseJ(f.p,d))}catch(e){errs.push({n:f.name,m:e.message})}}
+    // Parallel fetch — all sources at once, 5s timeout each
+    const PROXIES=[
+      u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+      u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      u=>`https://proxy.corsfix.com/?${u}`,
+    ];
+    async function fetchOne(feed) {
+      for(const proxy of PROXIES) {
+        try {
+          const r=await fetch(proxy(feed.url),{signal:AbortSignal.timeout(5000)});
+          if(!r.ok) continue;
+          const d=await r.json();
+          return parseJ(feed.p,d);
+        } catch { continue; }
+      }
+      return [];
+    }
+    const results=await Promise.allSettled(FEEDS.map(f=>fetchOne(f)));
+    results.forEach((r,i)=>{
+      if(r.status==="fulfilled"&&r.value.length>0) res.push(...r.value);
+      else errs.push({n:FEEDS[i].name,m:"failed"});
+    });
     if(errs.length)setFErr(errs);if(!res.length){res=[...DEMO];setDemo(true)}
     res.sort((a,b)=>new Date(b.dt)-new Date(a.dt));
     const uniq=new Map();res.forEach(j=>uniq.set(j.url,j));res=[...uniq.values()];
